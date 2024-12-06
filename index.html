@@ -8,7 +8,7 @@
 </head>
 <body>
     <h1>Modelador de Superfícies B-Spline</h1>
-    
+
     <div>
         <label for="rows">Número de Linhas (4 a 100): </label>
         <input type="number" id="rows" min="4" max="100" value="4">
@@ -18,7 +18,33 @@
         <input type="number" id="cols" min="4" max="100" value="4">
     </div>
     <button onclick="generateSurface()">Gerar Superfície</button>
-    
+
+    <div>
+        <label for="controlPoint">Selecione o Ponto de Controle: </label>
+        <select id="controlPoint" onchange="selectControlPoint()"></select>
+    </div>
+
+    <div>
+        <label for="colorPicker">Selecione a Cor: </label>
+        <input type="color" id="colorPicker">
+        <button onclick="changeControlPointColor()">Mudar Cor</button>
+    </div>
+    <div> <!-- Controles para Translação --> 
+        <h3>Translação</h3> 
+        <label for="dx">Dx:</label> <input type="number" id="dx" value="0"> 
+        <label for="dy">Dy:</label> <input type="number" id="dy" value="0"> 
+        <label for="dz">Dz:</label> <input type="number" id="dz" value="0"> 
+        <button id="translateButton">Transladar</button> </div> 
+        <div> <!-- Controles para Escala --> 
+            <h3>Escala</h3> 
+            <label for="scaleFactor">Fator de Escala:</label> 
+            <input type="number" id="scaleFactor" value="1"> 
+            <button id="scaleButton">Escalar</button> </div> 
+            <div> <!-- Controles para Rotação --> 
+                <h3>Rotação</h3> 
+                <label for="rotationAngle">Ângulo de Rotação (graus):</label> 
+                <input type="number" id="rotationAngle" value="0"> 
+                <button id="rotateButton">Rotacionar</button> </div>
     <canvas id="canvas"></canvas>
     <script src="script.js"></script>
 </body>
