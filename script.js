@@ -295,7 +295,44 @@ function crossProduct(vectorA, vectorB) {
     };
 }
 
-// Função para calcular a matriz de transformação do SR para SRC
+// Função para ajustar o tamanho do canvas com base na viewport
+function adjustCanvasSize(u_min, u_max, v_min, v_max) {
+    const canvasWidth = u_max - u_min;
+    const canvasHeight = v_max - v_min;
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    // Redesenhar a superfície para aplicar as novas dimensões do canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBSplineSurface(surface); // Certifique-se de chamar a função correta para desenhar a superfície
+}
+
+// Função para aplicar a matriz de projeção Mjp e ajustar o canvas
+function applyProjectionTransformation() {
+    // Obter os valores da window e viewport do usuário
+    let x_min = parseFloat(document.getElementById('x_min').value);
+    let x_max = parseFloat(document.getElementById('x_max').value);
+    let y_min = parseFloat(document.getElementById('y_min').value);
+    let y_max = parseFloat(document.getElementById('y_max').value);
+    let u_min = parseFloat(document.getElementById('u_min').value);
+    let u_max = parseFloat(document.getElementById('u_max').value);
+    let v_min = parseFloat(document.getElementById('v_min').value);
+    let v_max = parseFloat(document.getElementById('v_max').value);
+
+    projectionMatrixMJP = calculateProjectionMatrix(x_min, x_max, y_min, y_max, u_min, u_max, v_min, v_max);
+
+    if (transformationMatrixSRC && projectionMatrixMJP) {
+        finalTransformationMatrix = multiplyMatrices(projectionMatrixMJP, transformationMatrixSRC);
+
+        // Ajustar o tamanho do canvas com base na viewport
+        adjustCanvasSize(u_min, u_max, v_min, v_max);
+    }
+}
+
+document.getElementById('applyProjectionButton').addEventListener('click', applyProjectionTransformation);
+
+
 function calculateTransformationMatrix(VRP, P, Y) {
     let n = normalizeVector({
         x: VRP.x - P.x,
@@ -324,6 +361,16 @@ function calculateTransformationMatrix(VRP, P, Y) {
     ];
 }
 
+function calculateProjectionMatrix(x_min, x_max, y_min, y_max, u_min, u_max, v_min, v_max) {
+    return [
+        [(u_max - u_min) / (x_max - x_min), 0, 0, -x_min * (u_max - u_min) / (x_max - x_min) + u_min],
+        [0, (v_min - v_max) / (y_max - y_min), 0, y_min * (v_max - v_min) / (y_max - y_min) + v_max],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ];
+}
+
+
 // Função para aplicar a matriz de transformação do SR para SRC aos pontos de controle
 function applySRtoSRCTransformation() {
     // Obter os valores de VRP, P e Y do usuário
@@ -331,22 +378,101 @@ function applySRtoSRCTransformation() {
     let P = { x: parseFloat(document.getElementById('P_x').value), y: parseFloat(document.getElementById('P_y').value), z: parseFloat(document.getElementById('P_z').value) };
     let Y = { x: parseFloat(document.getElementById('Y_x').value), y: parseFloat(document.getElementById('Y_y').value), z: parseFloat(document.getElementById('Y_z').value) };
 
-    let transformationMatrix = calculateTransformationMatrix(VRP, P, Y);
-
-    for (let i = 0; i < surface.rows; i++) {
-        for (let j = 0; j < surface.cols; j++) {
-            let point = surface.getPoint(i, j);
-            let [x, y, z, w] = multiplyMatrixAndPoint(transformationMatrix, [point.x, point.y, point.z, 1]);
-            surface.setPoint(i, j, x, y, z, point.color);
-        }
-    }
-
-    // Redesenhar a superfície para aplicar a nova transformação
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawBSplineSurface(surface);
+    transformationMatrixSRC = calculateTransformationMatrix(VRP, P, Y);
 }
 
 document.getElementById('applyTransformationButton').addEventListener('click', applySRtoSRCTransformation);
+
+// Função para aplicar a matriz de projeção \( M_{jp} \) aos pontos da superfície
+function calculateAndStoreProjectionMatrix() {
+    // Obter os valores da window e viewport do usuário
+    let x_min = parseFloat(document.getElementById('x_min').value);
+    let x_max = parseFloat(document.getElementById('x_max').value);
+    let y_min = parseFloat(document.getElementById('y_min').value);
+    let y_max = parseFloat(document.getElementById('y_max').value);
+    let u_min = parseFloat(document.getElementById('u_min').value);
+    let u_max = parseFloat(document.getElementById('u_max').value);
+    let v_min = parseFloat(document.getElementById('v_min').value);
+    let v_max = parseFloat(document.getElementById('v_max').value);
+
+    projectionMatrixMJP = calculateProjectionMatrix(x_min, x_max, y_min, y_max, u_min, u_max, v_min, v_max);
+}
+
+document.getElementById('applyProjectionButton').addEventListener('click', calculateAndStoreProjectionMatrix);
+
+// Função para multiplicar duas matrizes 4x4
+function multiplyMatrices(matrixA, matrixB) {
+    let result = Array(4).fill(null).map(() => Array(4).fill(0));
+
+    for (let i = 0; i < 4; i++) {
+        for (let j = 0; j < 4; j++) {
+            for (let k = 0; k < 4; k++) {
+                result[i][j] += matrixA[i][k] * matrixB[k][j];
+            }
+        }
+    }
+
+    return result;
+}
+
+// Variáveis globais para armazenar as matrizes de transformação
+let transformationMatrixSRC = null;
+let projectionMatrixMJP = null;
+let finalTransformationMatrix = null;
+
+// Função para aplicar a matriz de transformação do SR para SRC aos pontos de controle
+function applySRtoSRCTransformation() {
+    // Obter os valores de VRP, P e Y do usuário
+    let VRP = { x: parseFloat(document.getElementById('VRP_x').value), y: parseFloat(document.getElementById('VRP_y').value), z: parseFloat(document.getElementById('VRP_z').value) };
+    let P = { x: parseFloat(document.getElementById('P_x').value), y: parseFloat(document.getElementById('P_y').value), z: parseFloat(document.getElementById('P_z').value) };
+    let Y = { x: parseFloat(document.getElementById('Y_x').value), y: parseFloat(document.getElementById('Y_y').value), z: parseFloat(document.getElementById('Y_z').value) };
+
+    transformationMatrixSRC = calculateTransformationMatrix(VRP, P, Y);
+}
+
+document.getElementById('applyTransformationButton').addEventListener('click', applySRtoSRCTransformation);
+
+// Função para aplicar a matriz de projeção \( M_{jp} \) aos pontos da superfície
+function calculateAndStoreProjectionMatrix() {
+    // Obter os valores da window e viewport do usuário
+    let x_min = parseFloat(document.getElementById('x_min').value);
+    let x_max = parseFloat(document.getElementById('x_max').value);
+    let y_min = parseFloat(document.getElementById('y_min').value);
+    let y_max = parseFloat(document.getElementById('y_max').value);
+    let u_min = parseFloat(document.getElementById('u_min').value);
+    let u_max = parseFloat(document.getElementById('u_max').value);
+    let v_min = parseFloat(document.getElementById('v_min').value);
+    let v_max = parseFloat(document.getElementById('v_max').value);
+
+    projectionMatrixMJP = calculateProjectionMatrix(x_min, x_max, y_min, y_max, u_min, u_max, v_min, v_max);
+
+    if (transformationMatrixSRC && projectionMatrixMJP) {
+        finalTransformationMatrix = multiplyMatrices(projectionMatrixMJP, transformationMatrixSRC);
+    }
+}
+
+document.getElementById('applyProjectionButton').addEventListener('click', calculateAndStoreProjectionMatrix);
+
+// Função para aplicar a matriz de transformação final aos pontos de controle
+function applyFinalTransformation() {
+    if (finalTransformationMatrix) {
+        for (let i = 0; i < surface.rows; i++) {
+            for (let j = 0; j < surface.cols; j++) {
+                let point = surface.getPoint(i, j);
+                let [x, y, z, w] = multiplyMatrixAndPoint(finalTransformationMatrix, [point.x, point.y, point.z, 1]);
+                surface.setPoint(i, j, x, y, z, point.color);
+            }
+        }
+
+        // Redesenhar a superfície para aplicar a nova transformação
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawBSplineSurface(surface);
+    } else {
+        console.log("Matriz de transformação final não foi calculada.");
+    }
+}
+
+document.getElementById('applyFinalTransformationButton').addEventListener('click', applyFinalTransformation);
 
 
 // Testando a geração e desenho da superfície
