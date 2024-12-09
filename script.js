@@ -270,6 +270,83 @@ document.getElementById('rotateButton').addEventListener('click', () => {
     applyTransformationWithAnchor(rotationMatrixZ(rotationAngle));
 });
 
+// Função para calcular a norma de um vetor
+function vectorNorm(vector) {
+    return Math.sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+// Função para normalizar um vetor
+function normalizeVector(vector) {
+    let norm = vectorNorm(vector);
+    return { x: vector.x / norm, y: vector.y / norm, z: vector.z / norm };
+}
+
+// Função para calcular o produto escalar de dois vetores
+function dotProduct(vectorA, vectorB) {
+    return vectorA.x * vectorB.x + vectorA.y * vectorB.y + vectorA.z * vectorB.z;
+}
+
+// Função para calcular o produto vetorial de dois vetores
+function crossProduct(vectorA, vectorB) {
+    return {
+        x: vectorA.y * vectorB.z - vectorA.z * vectorB.y,
+        y: vectorA.z * vectorB.x - vectorA.x * vectorB.z,
+        z: vectorA.x * vectorB.y - vectorA.y * vectorB.x
+    };
+}
+
+// Função para calcular a matriz de transformação do SR para SRC
+function calculateTransformationMatrix(VRP, P, Y) {
+    let n = normalizeVector({
+        x: VRP.x - P.x,
+        y: VRP.y - P.y,
+        z: VRP.z - P.z
+    });
+
+    let Y_dot_n = dotProduct(Y, n);
+    let Y_minus_Y_dot_n_n = {
+        x: Y.x - Y_dot_n * n.x,
+        y: Y.y - Y_dot_n * n.y,
+        z: Y.z - Y_dot_n * n.z
+    };
+    let v = normalizeVector(Y_minus_Y_dot_n_n);
+    let u = crossProduct(v, n);
+
+    let VRP_dot_u = dotProduct(VRP, u);
+    let VRP_dot_v = dotProduct(VRP, v);
+    let VRP_dot_n = dotProduct(VRP, n);
+
+    return [
+        [u.x, u.y, u.z, -VRP_dot_u],
+        [v.x, v.y, v.z, -VRP_dot_v],
+        [n.x, n.y, n.z, -VRP_dot_n],
+        [0, 0, 0, 1]
+    ];
+}
+
+// Função para aplicar a matriz de transformação do SR para SRC aos pontos de controle
+function applySRtoSRCTransformation() {
+    // Obter os valores de VRP, P e Y do usuário
+    let VRP = { x: parseFloat(document.getElementById('VRP_x').value), y: parseFloat(document.getElementById('VRP_y').value), z: parseFloat(document.getElementById('VRP_z').value) };
+    let P = { x: parseFloat(document.getElementById('P_x').value), y: parseFloat(document.getElementById('P_y').value), z: parseFloat(document.getElementById('P_z').value) };
+    let Y = { x: parseFloat(document.getElementById('Y_x').value), y: parseFloat(document.getElementById('Y_y').value), z: parseFloat(document.getElementById('Y_z').value) };
+
+    let transformationMatrix = calculateTransformationMatrix(VRP, P, Y);
+
+    for (let i = 0; i < surface.rows; i++) {
+        for (let j = 0; j < surface.cols; j++) {
+            let point = surface.getPoint(i, j);
+            let [x, y, z, w] = multiplyMatrixAndPoint(transformationMatrix, [point.x, point.y, point.z, 1]);
+            surface.setPoint(i, j, x, y, z, point.color);
+        }
+    }
+
+    // Redesenhar a superfície para aplicar a nova transformação
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBSplineSurface(surface);
+}
+
+document.getElementById('applyTransformationButton').addEventListener('click', applySRtoSRCTransformation);
 
 
 // Testando a geração e desenho da superfície
