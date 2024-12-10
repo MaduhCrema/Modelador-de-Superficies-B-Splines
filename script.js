@@ -1,7 +1,7 @@
 class BSplineSurface {
     constructor(rows, cols) {
         this.rows = rows;
-        this.cols = cols; // Corrigido: cols = rows -> cols
+        this.cols = cols;
         this.points = this.createControlPoints(rows, cols);
     }
 
@@ -43,7 +43,7 @@ let selectedPoint = null;
 function drawPoint(x, y, color = 'black') {
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI * 2, true); // Aumentei o raio para melhor visibilidade
+    ctx.arc(x, y, 5, 0, Math.PI * 2, true);
     ctx.fill();
 }
 
@@ -91,6 +91,43 @@ function drawBSplineSurface(surface) {
             drawLine(point1.x + offsetX, point1.y + offsetY, point2.x + offsetX, point2.y + offsetY);
         }
     }
+
+    // Gerar pontos de u e v (em vermelho)
+    const uSteps = 10; // Número de divisões para u
+    const vSteps = 10; // Número de divisões para v
+    let numCalculatedPoints = 0;
+
+    for (let i = 0; i <= uSteps; i++) {
+        for (let j = 0; j <= vSteps; j++) {
+            const u = i / uSteps;
+            const v = j / vSteps;
+            const point = calculateBSplinePoint(u, v);
+            drawPoint(point.x + offsetX, point.y + offsetY, 'red'); // Pinta de vermelho
+            numCalculatedPoints++;
+        }
+    }
+
+    console.log(`Número de pontos calculados: ${numCalculatedPoints}`); // Imprime no console
+}
+
+// Função para calcular o ponto da superfície a partir dos parâmetros u e v
+function calculateBSplinePoint(u, v) {
+    // Calcular as coordenadas (i, j) dos pontos de controle
+    const i = Math.min(Math.floor(u * (surface.rows - 1)), surface.rows - 2); // Ajusta para evitar ultrapassar o limite
+    const j = Math.min(Math.floor(v * (surface.cols - 1)), surface.cols - 2); // Ajusta para evitar ultrapassar o limite
+
+    // Acesso aos pontos de controle vizinhos
+    const p00 = surface.getPoint(i, j);
+    const p01 = surface.getPoint(i, j + 1);
+    const p10 = surface.getPoint(i + 1, j);
+    const p11 = surface.getPoint(i + 1, j + 1);
+
+    // Interpolação bilinear simples para calcular o ponto (u, v)
+    const x = (1 - u) * (1 - v) * p00.x + u * (1 - v) * p01.x + (1 - u) * v * p10.x + u * v * p11.x;
+    const y = (1 - u) * (1 - v) * p00.y + u * (1 - v) * p01.y + (1 - u) * v * p10.y + u * v * p11.y;
+    const z = (1 - u) * (1 - v) * p00.z + u * (1 - v) * p01.z + (1 - u) * v * p10.z + u * v * p11.z;
+
+    return { x, y, z };
 }
 
 canvas.addEventListener('mousedown', e => {
@@ -128,9 +165,6 @@ canvas.addEventListener('mousemove', e => {
     }
 });
 
-
 canvas.addEventListener('mouseup', () => {
     selectedPoint = null;
 });
-
-
