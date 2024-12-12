@@ -20,48 +20,6 @@
             <input type="number" id="cols" min="4" max="100" value="4">
             <button onclick="generateSurface()">Gerar Superfície</button>
         </section>
-
-        <!-- Controles de Transformações -->
-        <section class="controls">
-            <h2>Transformações Geométricas</h2>
-            <h3>Translação</h3>
-            <label for="dx">Dx:</label>
-            <input type="number" id="dx" value="0">
-            <label for="dy">Dy:</label>
-            <input type="number" id="dy" value="0">
-            <label for="dz">Dz:</label>
-            <input type="number" id="dz" value="0">
-            <button id="translateButton">Transladar</button>
-
-            <h3>Escala</h3>
-            <label for="scaleFactor">Fator de Escala:</label>
-            <input type="number" id="scaleFactor" value="1">
-            <button id="scaleButton">Escalar</button>
-
-            <h3>Rotação</h3>
-            <label for="rotationAngle">Ângulo de Rotação (graus):</label>
-            <input type="number" id="rotationAngle" value="0">
-            <button id="rotateButton">Rotacionar</button>
-        </section>
-
-        <!-- Configurações de Câmera, Window e Viewport -->
-        <section class="controls">
-            <h2>Configurações de Projeção</h2>
-            <h3>Parâmetros da Câmera</h3>
-            <div class="camera-params">
-                <label for="VRP_x">VRP_x:</label> <input type="number" id="VRP_x" value="0">
-                <label for="VRP_y">VRP_y:</label> <input type="number" id="VRP_y" value="0">
-                <label for="VRP_z">VRP_z:</label> <input type="number" id="VRP_z" value="0">
-            </div>
-            <h3>Parâmetros da Window</h3>
-            <div class="window-params">
-                <label for="x_min">x_min:</label> <input type="number" id="x_min" value="0">
-                <label for="x_max">x_max:</label> <input type="number" id="x_max" value="1">
-                <label for="y_min">y_min:</label> <input type="number" id="y_min" value="0">
-                <label for="y_max">y_max:</label> <input type="number" id="y_max" value="1">
-            </div>
-            <button id="applyProjectionButton">Aplicar Projeção</button>
-        </section>
         <canvas id="canvas" width="800" height="600"></canvas>
     </main>
     <footer>
