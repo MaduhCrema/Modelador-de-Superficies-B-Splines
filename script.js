@@ -5,6 +5,7 @@ class BSplineSurface {
         this.points = this.createControlPoints(rows, cols);
     }
 
+    // Cria os pontos de controle
     createControlPoints(rows, cols) {
         let points = [];
         const stepX = 100;
@@ -18,6 +19,7 @@ class BSplineSurface {
         return points;
     }
 
+    // Obtém o ponto de controle em uma posição específica
     getPoint(row, col) {
         if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
             return this.points[row][col];
@@ -26,6 +28,7 @@ class BSplineSurface {
         }
     }
 
+    // Define os valores de um ponto de controle
     setPoint(row, col, x, y, z, color = 'black') {
         if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
             this.points[row][col] = { x, y, z, color };
@@ -34,33 +37,73 @@ class BSplineSurface {
         }
     }
 
-    transformToSRC() {
-        const scale = 0.5; // Exemplo de escala
-        const translateX = 400; // Exemplo de translação
-        const translateY = 300;
+    // Transformação de SRU para SRC
+    transformToSRC(VRP, P, Y) {
 
-        this.points = this.points.map(row =>
-            row.map(point => ({
-                x: point.x * scale + translateX,
-                y: point.y * scale + translateY,
-                z: point.z,
-                color: point.color
-            }))
-        );
-    }
+        //transforma o vetor para objeto
+        VRP = { x: VRP[0], y: VRP[1], z: VRP[2] };
+        P = { x: P[0], y: P[1], z: P[2] };
+        Y = { x: Y[0], y: Y[1], z: Y[2] };
 
-    applyAxonometricProjection(alpha, beta) {
-        const radAlpha = (Math.PI / 180) * alpha;
-        const radBeta = (Math.PI / 180) * beta;
+        // Cálculo do vetor N (normalizado)
+        let N = {
+            x: VRP.x - P.x,
+            y: VRP.y - P.y,
+            z: VRP.z - P.z
+        };
+        
+        //normaliza
+        const nLength = Math.sqrt(N.x ** 2 + N.y ** 2 + N.z ** 2);
+        N = { x: N.x / nLength, y: N.y / nLength, z: N.z / nLength };
+        
+        // Cálculo do vetor V (normalizado) c = y*n
+        let YDotN = Y.x * N.x + Y.y * N.y + Y.z * N.z;
+        let V = {//y-c
+            x: Y.x - YDotN * N.x,
+            y: Y.y - YDotN * N.y,
+            z: Y.z - YDotN * N.z
+        };
+        //normaliza
+        const vLength = Math.sqrt(V.x ** 2 + V.y ** 2 + V.z ** 2);
+        V = { x: V.x / vLength, y: V.y / vLength, z: V.z / vLength };
+        
+        // Cálculo do vetor U
+        const U = { //v*n
+            x: V.y * N.z - V.z * N.y,
+            y: V.z * N.x - V.x * N.z,
+            z: V.x * N.y - V.y * N.x
+        };
+        
+        // Matriz de transformação de SRU para SRC
+        const transformationMatrix = [
+            [U.x, U.y, U.z, -(VRP.x * U.x + VRP.y * U.y + VRP.z * U.z)],
+            [V.x, V.y, V.z, -(VRP.x * V.x + VRP.y * V.y + VRP.z * V.z)],
+            [N.x, N.y, N.z, -(VRP.x * N.x + VRP.y * N.y + VRP.z * N.z)],
+            [0, 0, 0, 1]
+        ];
 
+        // Aplicar a transformação a todos os pontos
         this.points = this.points.map(row =>
             row.map(point => {
-                const x = point.x * Math.cos(radBeta) - point.z * Math.sin(radBeta);
-                const y = point.x * Math.sin(radAlpha) * Math.sin(radBeta) + point.y * Math.cos(radAlpha) - point.z * Math.sin(radAlpha) * Math.cos(radBeta);
-                return { ...point, x, y };
+                const x = point.x, y = point.y, z = point.z;
+                const transformed = {
+                    x: transformationMatrix[0][0] * x + transformationMatrix[0][1] * y + transformationMatrix[0][2] * z + transformationMatrix[0][3],
+                    y: transformationMatrix[1][0] * x + transformationMatrix[1][1] * y + transformationMatrix[1][2] * z + transformationMatrix[1][3],
+                    z: transformationMatrix[2][0] * x + transformationMatrix[2][1] * y + transformationMatrix[2][2] * z + transformationMatrix[2][3],
+                    color: point.color
+                };
+                return transformed;
             })
         );
+
+        console.log("Pontos após a transformação para SRC:");
+        console.log(this.points);
     }
+
+    applyAxonometricProjection() {
+        
+    }
+    
 
     getRectangles() {
         const rectangles = [];
@@ -78,6 +121,7 @@ class BSplineSurface {
         return rectangles;
     }
 }
+
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -112,9 +156,13 @@ function generateSurface() {
     const rows = parseInt(document.getElementById('rows').value) + 1;
     const cols = parseInt(document.getElementById('cols').value) + 1;
 
+    //exemplo para teste da trannsformação
     surface = new BSplineSurface(rows, cols);
-    surface.transformToSRC();
-    surface.applyAxonometricProjection(60, 30); // Aplica a projeção axonométrica ajustada
+    vrp = [100,100,100]
+    p=[0,0,0]
+    y=[0,1,0]
+    surface.transformToSRC(vrp, p, y);
+    //surface.applyAxonometricProjection(35.264, 45); // Aplica a projeção axonométrica 
 
     canvas.width = 1000;
     canvas.height = 800;
