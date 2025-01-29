@@ -1,229 +1,295 @@
-class BSplineSurface {
-    constructor(rows, cols) {
-        this.rows = rows;
-        this.cols = cols;
-        this.points = this.createControlPoints(rows, cols);
-    }
+ // B-Spline Surface class implementation
+ class BSplineSurface {
+  constructor(nRows, nCols, uStep, vStep) {
+      this.nRows = nRows;
+      this.nCols = nCols;
+      this.uStep = uStep;
+      this.vStep = vStep;
+      this.degree = 3;
+      this.controlPoints = [];
+      this.knotsU = [];
+      this.knotsV = [];
+      this.initializeControlPoints();
+      this.generateKnots();
+  }
 
-    // Cria os pontos de controle
-    createControlPoints(rows, cols) {
-        let points = [];
-        const stepX = 100;
-        const stepY = 100;
-        for (let i = 0; i < rows; i++) {
-            points[i] = [];
-            for (let j = 0; j < cols; j++) {
-                points[i][j] = { x: j * stepX, y: i * stepY, z: 0, color: 'black' };
-            }
-        }
-        return points;
-    }
+  initializeControlPoints() {
+      for (let i = 0; i < this.nRows; i++) {
+          this.controlPoints[i] = [];
+          for (let j = 0; j < this.nCols; j++) {
+              this.controlPoints[i][j] = {
+                  x: (j - (this.nCols-1)/2) * 2,
+                  y: (i - (this.nRows-1)/2) * 2,
+                  z: Math.sin(Math.PI * i/this.nRows) * Math.cos(Math.PI * j/this.nCols) * 2
+              };
+          }
+      }
+  }
 
-    // Obtém o ponto de controle em uma posição específica
-    getPoint(row, col) {
-        if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
-            return this.points[row][col];
-        } else {
-            throw new Error("Índices fora do intervalo.");
-        }
-    }
+  generateKnots() {
+      const nKnotsU = this.nRows + this.degree + 1;
+      const nKnotsV = this.nCols + this.degree + 1;
 
-    // Define os valores de um ponto de controle
-    setPoint(row, col, x, y, z, color = 'black') {
-        if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
-            this.points[row][col] = { x, y, z, color };
-        } else {
-            throw new Error("Índices fora do intervalo.");
-        }
-    }
+      for (let i = 0; i < nKnotsU; i++) {
+          if (i < this.degree) {
+              this.knotsU[i] = 0;
+          } else if (i > this.nRows) {
+              this.knotsU[i] = 1;
+          } else {
+              this.knotsU[i] = (i - this.degree) / (this.nRows - this.degree + 1);
+          }
+      }
 
-    // Transformação de SRU para SRC
-    transformToSRC(VRP, P, Y) {
+      for (let i = 0; i < nKnotsV; i++) {
+          if (i < this.degree) {
+              this.knotsV[i] = 0;
+          } else if (i > this.nCols) {
+              this.knotsV[i] = 1;
+          } else {
+              this.knotsV[i] = (i - this.degree) / (this.nCols - this.degree + 1);
+          }
+      }
+  }
 
-        //transforma o vetor para objeto
-        VRP = { x: VRP[0], y: VRP[1], z: VRP[2] };
-        P = { x: P[0], y: P[1], z: P[2] };
-        Y = { x: Y[0], y: Y[1], z: Y[2] };
+  basisFunction(t, i, k, knots) {
+      if (k === 0) {
+          return (t >= knots[i] && t < knots[i + 1]) ? 1 : 0;
+      }
 
-        // Cálculo do vetor N (normalizado)
-        let N = {
-            x: VRP.x - P.x,
-            y: VRP.y - P.y,
-            z: VRP.z - P.z
-        };
-        
-        //normaliza
-        const nLength = Math.sqrt(N.x ** 2 + N.y ** 2 + N.z ** 2);
-        N = { x: N.x / nLength, y: N.y / nLength, z: N.z / nLength };
-        
-        // Cálculo do vetor V (normalizado) c = y*n
-        let YDotN = Y.x * N.x + Y.y * N.y + Y.z * N.z;
-        let V = {//y-c
-            x: Y.x - YDotN * N.x,
-            y: Y.y - YDotN * N.y,
-            z: Y.z - YDotN * N.z
-        };
-        //normaliza
-        const vLength = Math.sqrt(V.x ** 2 + V.y ** 2 + V.z ** 2);
-        V = { x: V.x / vLength, y: V.y / vLength, z: V.z / vLength };
-        
-        // Cálculo do vetor U
-        const U = { //v*n
-            x: V.y * N.z - V.z * N.y,
-            y: V.z * N.x - V.x * N.z,
-            z: V.x * N.y - V.y * N.x
-        };
-        
-        // Matriz de transformação de SRU para SRC
-        const transformationMatrix = [
-            [U.x, U.y, U.z, -(VRP.x * U.x + VRP.y * U.y + VRP.z * U.z)],
-            [V.x, V.y, V.z, -(VRP.x * V.x + VRP.y * V.y + VRP.z * V.z)],
-            [N.x, N.y, N.z, -(VRP.x * N.x + VRP.y * N.y + VRP.z * N.z)],
-            [0, 0, 0, 1]
-        ];
+      let w1 = 0;
+      let w2 = 0;
 
-        // Aplicar a transformação a todos os pontos
-        this.points = this.points.map(row =>
-            row.map(point => {
-                const x = point.x, y = point.y, z = point.z;
-                const transformed = {
-                    x: transformationMatrix[0][0] * x + transformationMatrix[0][1] * y + transformationMatrix[0][2] * z + transformationMatrix[0][3],
-                    y: transformationMatrix[1][0] * x + transformationMatrix[1][1] * y + transformationMatrix[1][2] * z + transformationMatrix[1][3],
-                    z: transformationMatrix[2][0] * x + transformationMatrix[2][1] * y + transformationMatrix[2][2] * z + transformationMatrix[2][3],
-                    color: point.color
-                };
-                return transformed;
-            })
-        );
+      if (knots[i + k] - knots[i] !== 0) {
+          w1 = ((t - knots[i]) / (knots[i + k] - knots[i])) * 
+               this.basisFunction(t, i, k - 1, knots);
+      }
 
-        console.log("Pontos após a transformação para SRC:");
-        console.log(this.points);
-    }
+      if (knots[i + k + 1] - knots[i + 1] !== 0) {
+          w2 = ((knots[i + k + 1] - t) / (knots[i + k + 1] - knots[i + 1])) * 
+               this.basisFunction(t, i + 1, k - 1, knots);
+      }
 
-    applyAxonometricProjection() {
-        
-    }
-    
+      return w1 + w2;
+  }
 
-    getRectangles() {
-        const rectangles = [];
-        for (let i = 0; i < this.rows - 1; i++) {
-            for (let j = 0; j < this.cols - 1; j++) {
-                const p1 = this.getPoint(i, j);
-                const p2 = this.getPoint(i, j + 1);
-                const p3 = this.getPoint(i + 1, j);
-                const p4 = this.getPoint(i + 1, j + 1);
+  calculatePoint(u, v) {
+      let point = { x: 0, y: 0, z: 0 };
+      let weightSum = 0;
 
-                const avgZ = (p1.z + p2.z + p3.z + p4.z) / 4;
-                rectangles.push({ points: [p1, p2, p4, p3], avgZ });
-            }
-        }
-        return rectangles;
-    }
+      for (let i = 0; i < this.nRows; i++) {
+          for (let j = 0; j < this.nCols; j++) {
+              const basisU = this.basisFunction(u, i, this.degree, this.knotsU);
+              const basisV = this.basisFunction(v, j, this.degree, this.knotsV);
+              const weight = basisU * basisV;
+
+              point.x += this.controlPoints[i][j].x * weight;
+              point.y += this.controlPoints[i][j].y * weight;
+              point.z += this.controlPoints[i][j].z * weight;
+              weightSum += weight;
+          }
+      }
+
+      if (weightSum > 0) {
+          point.x /= weightSum;
+          point.y /= weightSum;
+          point.z /= weightSum;
+      }
+
+      return point;
+  }
+
+  generateSurfacePoints() {
+      const surfacePoints = [];
+      for (let u = 0; u <= 1; u += this.uStep) {
+          const row = [];
+          for (let v = 0; v <= 1; v += this.vStep) {
+              row.push(this.calculatePoint(u, v));
+          }
+          surfacePoints.push(row);
+      }
+      return surfacePoints;
+  }
+
+  getControlPoints() {
+      return this.controlPoints;
+  }
+
+  updateControlPoint(i, j, newPoint) {
+    this.controlPoints[i][j] = newPoint;
+}
 }
 
-
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-let surface;
+// Global variables for interaction
+let surface;  // será nossa superfície global
+let isDragging = false;
 let selectedPoint = null;
+let scale = 80;             // Adicione esta linha
+let offsetX = 400;          // Adicione esta linha
+let offsetY = 300;          // Adicione esta linha
 
-function drawPoint(x, y, color = 'black') {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI * 2, true);
-    ctx.fill();
+// Canvas rendering functions
+function project3DTo2D(point, scale = 100, rotationX = 0.5, rotationY = 0.5) {
+  const x = point.x;
+  const y = point.y * Math.cos(rotationX) - point.z * Math.sin(rotationX);
+  const z = point.y * Math.sin(rotationX) + point.z * Math.cos(rotationX);
+  
+  return {
+      x: x * Math.cos(rotationY) - z * Math.sin(rotationY),
+      y: y
+  };
 }
 
-function drawLine(x1, y1, x2, y2, color = 'black') {
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+function findNearestControlPoint(x, y) {
+  const controlPoints = surface.getControlPoints();
+  let minDist = Infinity;
+  let nearest = null;
+
+  for (let i = 0; i < controlPoints.length; i++) {
+      for (let j = 0; j < controlPoints[i].length; j++) {
+          const point = project3DTo2D(controlPoints[i][j]);
+          const screenX = point.x * scale + offsetX;
+          const screenY = point.y * scale + offsetY;
+          
+          const dist = Math.sqrt(
+              Math.pow(screenX - x, 2) + 
+              Math.pow(screenY - y, 2)
+          );
+
+          if (dist < minDist && dist < 20) {
+              minDist = dist;
+              nearest = { i, j };
+          }
+      }
+  }
+
+  return nearest;
 }
 
-function drawRectangle(points, color = '#f9f9f9') {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    points.forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.closePath();
-    ctx.fill();
+function drawSurface(points, controlPoints) {
+  const canvas = document.getElementById('surfaceCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const scale = 80;
+  const offsetX = canvas.width / 2;
+  const offsetY = canvas.height / 2;
+
+  // Draw surface grid
+  for (let i = 0; i < points.length; i++) {
+      for (let j = 0; j < points[i].length; j++) {
+          const current = project3DTo2D(points[i][j], scale);
+          
+          // Draw to next point in row
+          if (j < points[i].length - 1) {
+              const next = project3DTo2D(points[i][j + 1], scale);
+              ctx.beginPath();
+              ctx.moveTo(current.x * scale + offsetX, current.y * scale + offsetY);
+              ctx.lineTo(next.x * scale + offsetX, next.y * scale + offsetY);
+              ctx.strokeStyle = 'black';
+              ctx.stroke();
+          }
+
+          // Draw to next point in column
+          if (i < points.length - 1) {
+              const next = project3DTo2D(points[i + 1][j], scale);
+              ctx.beginPath();
+              ctx.moveTo(current.x * scale + offsetX, current.y * scale + offsetY);
+              ctx.lineTo(next.x * scale + offsetX, next.y * scale + offsetY);
+              ctx.strokeStyle = 'black';
+              ctx.stroke();
+          }
+
+          // Fill quadrilateral
+          if (i < points.length - 1 && j < points[i].length - 1) {
+              const p1 = project3DTo2D(points[i][j], scale);
+              const p2 = project3DTo2D(points[i][j + 1], scale);
+              const p3 = project3DTo2D(points[i + 1][j + 1], scale);
+              const p4 = project3DTo2D(points[i + 1][j], scale);
+
+              ctx.beginPath();
+              ctx.moveTo(p1.x * scale + offsetX, p1.y * scale + offsetY);
+              ctx.lineTo(p2.x * scale + offsetX, p2.y * scale + offsetY);
+              ctx.lineTo(p3.x * scale + offsetX, p3.y * scale + offsetY);
+              ctx.lineTo(p4.x * scale + offsetX, p4.y * scale + offsetY);
+              ctx.closePath();
+              ctx.fillStyle = 'white';
+              ctx.fill();
+              ctx.strokeStyle = 'black';
+              ctx.stroke();
+          }
+      }
+  }
+
+  // Draw control points
+  for (let i = 0; i < controlPoints.length; i++) {
+      for (let j = 0; j < controlPoints[i].length; j++) {
+          const point = project3DTo2D(controlPoints[i][j], scale);
+          
+          ctx.beginPath();
+          ctx.arc(
+              point.x * scale + offsetX,
+              point.y * scale + offsetY,
+              4, // radius
+              0,
+              2 * Math.PI
+          );
+          // No loop que desenha os pontos de controle, modifique a cor do preenchimento:
+          ctx.fillStyle = selectedPoint && selectedPoint.i === i && selectedPoint.j === j ? 'yellow' : 'red';
+          ctx.fill();
+      }
+  }
 }
 
 function generateSurface() {
-    const rows = parseInt(document.getElementById('rows').value) + 1;
-    const cols = parseInt(document.getElementById('cols').value) + 1;
+  const nRows = parseInt(document.getElementById('nRows').value);
+  const nCols = parseInt(document.getElementById('nCols').value);
+  const uStep = parseFloat(document.getElementById('uStep').value);
+  const vStep = parseFloat(document.getElementById('vStep').value);
 
-    //exemplo para teste da trannsformação
-    surface = new BSplineSurface(rows, cols);
-    vrp = [100,100,100]
-    p=[0,0,0]
-    y=[0,1,0]
-    surface.transformToSRC(vrp, p, y);
-    //surface.applyAxonometricProjection(35.264, 45); // Aplica a projeção axonométrica 
-
-    canvas.width = 1000;
-    canvas.height = 800;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    drawBSplineSurface(surface);
+  surface = new BSplineSurface(nRows, nCols, uStep, vStep);
+  redrawSurface();
 }
 
-function drawBSplineSurface(surface) {
-    const rectangles = surface.getRectangles();
-
-    // Ordena os retângulos do mais distante (menor avgZ) para o mais próximo (maior avgZ)
-    rectangles.sort((a, b) => b.avgZ - a.avgZ);
-
-    // Desenha os retângulos na ordem fundo-para-frente, algoritmo do pintor
-    rectangles.forEach(rect => drawRectangle(rect.points));
-
-    // Opcional: desenha as bordas para maior visibilidade
-    rectangles.forEach(rect => {
-        for (let i = 0; i < rect.points.length; i++) {
-            const p1 = rect.points[i];
-            const p2 = rect.points[(i + 1) % rect.points.length];
-            drawLine(p1.x, p1.y, p2.x, p2.y);
-        }
-    });
-
-    // Desenha os pontos (vértices) da superfície
-    surface.points.forEach(row =>
-        row.forEach(point => drawPoint(point.x, point.y, 'black'))
-    );
+function redrawSurface() {
+  const points = surface.generateSurfacePoints();
+  const controlPoints = surface.getControlPoints();
+  drawSurface(points, controlPoints);
 }
 
-canvas.addEventListener('mousedown', e => {
+const canvas = document.getElementById('surfaceCanvas');
+
+canvas.addEventListener('mousedown', (e) => {
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    surface.points.forEach((row, i) =>
-        row.forEach((point, j) => {
-            const dist = Math.hypot(mouseX - point.x, mouseY - point.y);
-            if (dist < 10) {
-                selectedPoint = { i, j };
-            }
-        })
-    );
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    selectedPoint = findNearestControlPoint(x, y);
+    if (selectedPoint) {
+        isDragging = true;
+        redrawSurface();
+    }
 });
 
-canvas.addEventListener('mousemove', e => {
-    if (selectedPoint) {
+canvas.addEventListener('mousemove', (e) => {
+    if (isDragging && selectedPoint) {
         const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const { i, j } = selectedPoint;
-        surface.setPoint(i, j, mouseX, mouseY, 0);
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawBSplineSurface(surface);
+        const x = (e.clientX - rect.left - offsetX) / scale;
+        const y = (e.clientY - rect.top - offsetY) / scale;
+        
+        const controlPoints = surface.getControlPoints();
+        const currentPoint = controlPoints[selectedPoint.i][selectedPoint.j];
+        
+        // Atualiza apenas y e z mantendo x constante
+        currentPoint.y = y;
+        currentPoint.z += (y - currentPoint.y) * 0.5;
+        
+        surface.updateControlPoint(selectedPoint.i, selectedPoint.j, currentPoint);
+        redrawSurface();
     }
 });
 
 canvas.addEventListener('mouseup', () => {
+    isDragging = false;
     selectedPoint = null;
+    redrawSurface();
 });
