@@ -27,6 +27,19 @@
          
             <button onclick="generateSurface()">Gerar Superfície</button>
         </div>
+        <div>
+            <label for="controlPointSelect">Selecione um ponto de controle:</label>
+            <select id="controlPointSelect"></select>
+          </div>
+          <div>
+            <label for="controlPointX">X:</label>
+            <input type="number" id="controlPointX" step="0.1">
+            <label for="controlPointY">Y:</label>
+            <input type="number" id="controlPointY" step="0.1">
+            <label for="controlPointZ">Z:</label>
+            <input type="number" id="controlPointZ" step="0.1">
+            <button onclick="updateSelectedControlPoint()">Atualizar</button>
+          </div>
         <canvas id="surfaceCanvas" width="800" height="600"></canvas>
     </div>
     </main>
