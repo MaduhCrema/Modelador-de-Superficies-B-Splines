@@ -142,6 +142,86 @@ let offsetX = 400;
 let offsetY = 300;
 const canvas = document.getElementById('surfaceCanvas');
 
+// Função auxiliar para obter a matriz de transformação SRC
+function transformToSRCMatrix(VRP, P, Y) {
+    VRP = { x: VRP[0], y: VRP[1], z: VRP[2] };
+    P = { x: P[0], y: P[1], z: P[2] };
+    Y = { x: Y[0], y: Y[1], z: Y[2] };
+
+    let N = { x: VRP.x - P.x, y: VRP.y - P.y, z: VRP.z - P.z };
+    const nLength = Math.sqrt(N.x ** 2 + N.y ** 2 + N.z ** 2);
+    N = { x: N.x / nLength, y: N.y / nLength, z: N.z / nLength };
+
+    let YDotN = Y.x * N.x + Y.y * N.y + Y.z * N.z;
+    let V = { x: Y.x - YDotN * N.x, y: Y.y - YDotN * N.y, z: Y.z - YDotN * N.z };
+    const vLength = Math.sqrt(V.x ** 2 + V.y ** 2 + V.z ** 2);
+    V = { x: V.x / vLength, y: V.y / vLength, z: V.z / vLength };
+
+    const U = { x: V.y * N.z - V.z * N.y, y: V.z * N.x - V.x * N.z, z: V.x * N.y - V.y * N.x };
+
+    return [
+        [U.x, U.y, U.z, -(VRP.x * U.x + VRP.y * U.y + VRP.z * U.z)],
+        [V.x, V.y, V.z, -(VRP.x * V.x + VRP.y * V.y + VRP.z * V.z)],
+        [N.x, N.y, N.z, -(VRP.x * N.x + VRP.y * N.y + VRP.z * N.z)],
+        [0, 0, 0, 1]
+    ];
+}
+
+function applyMatrixToPoint(matrix, point) {
+    const result = {
+        x: matrix[0][0] * point.x + matrix[0][1] * point.y + matrix[0][2] * point.z + matrix[0][3],
+        y: matrix[1][0] * point.x + matrix[1][1] * point.y + matrix[1][2] * point.z + matrix[1][3],
+        z: matrix[2][0] * point.x + matrix[2][1] * point.y + matrix[2][2] * point.z + matrix[2][3]
+    };
+    
+    const w = matrix[3][0] * point.x + matrix[3][1] * point.y + matrix[3][2] * point.z + matrix[3][3];
+    if (w !== 1 && w !== 0) {
+        result.x /= w;
+        result.y /= w;
+        result.z /= w;
+    }
+    
+    return result;
+}
+
+function calculateMappingMatrix() {
+    // Pegar valores da janela e viewport dos inputs
+    const xwMin = parseFloat(document.getElementById('xwMin').value);
+    const xwMax = parseFloat(document.getElementById('xwMax').value);
+    const ywMin = parseFloat(document.getElementById('ywMin').value);
+    const ywMax = parseFloat(document.getElementById('ywMax').value);
+    const xvMin = parseFloat(document.getElementById('xvMin').value);
+    const xvMax = parseFloat(document.getElementById('xvMax').value);
+    const yvMin = parseFloat(document.getElementById('yvMin').value);
+    const yvMax = parseFloat(document.getElementById('yvMax').value);
+
+    // Calcular escalas
+    const sx = (xvMax - xvMin) / (xwMax - xwMin);
+    const sy = (yvMax - yvMin) / (ywMax - ywMin);
+
+    // Matriz de Mapeamento (Mjp)
+    return [
+        [sx, 0, 0, -sx * xwMin + xvMin],
+        [0, -sy, 0, sy * ywMax + yvMin],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ];
+}
+
+function multiplyMatrices(m1, m2) {
+    const result = [];
+    for (let i = 0; i < 4; i++) {
+        result[i] = [];
+        for (let j = 0; j < 4; j++) {
+            result[i][j] = m1[i][0] * m2[0][j] + 
+                          m1[i][1] * m2[1][j] + 
+                          m1[i][2] * m2[2][j] + 
+                          m1[i][3] * m2[3][j];
+        }
+    }
+    return result;
+}
+
 function findNearestControlPoint(x, y) {
     const controlPoints = surface.getControlPoints();
     let minDist = Infinity;
@@ -168,75 +248,111 @@ function findNearestControlPoint(x, y) {
     return nearest;
 }
 
-function drawSurface(points, controlPoints) {
+function painterAlgorithm(points) {
+    const faces = [];
+  
+    for (let i = 0; i < points.length - 1; i++) {
+      for (let j = 0; j < points[i].length - 1; j++) {
+        const p1 = points[i][j];
+        const p2 = points[i][j + 1];
+        const p3 = points[i + 1][j + 1];
+        const p4 = points[i + 1][j];
+  
+        const face = [p1, p2, p3, p4];
+  
+        // Calculate face normal
+        const v1 = { x: p2.x - p1.x, y: p2.y - p1.y, z: p2.z - p1.z };
+        const v2 = { x: p4.x - p1.x, y: p4.y - p1.y, z: p4.z - p1.z };
+        const normal = {
+          x: v1.y * v2.z - v1.z * v2.y,
+          y: v1.z * v2.x - v1.x * v2.z,
+          z: v1.x * v2.y - v1.y * v2.x
+        };
+  
+        // Calculate face center
+        const center = {
+          x: (p1.x + p2.x + p3.x + p4.x) / 4,
+          y: (p1.y + p2.y + p3.y + p4.y) / 4,
+          z: (p1.z + p2.z + p3.z + p4.z) / 4
+        };
+  
+        faces.push({ face, normal, center });
+      }
+    }
+  
+    // Sort faces from back to front
+    faces.sort((a, b) => b.center.z - a.center.z);
+    
+    console.log("Visible faces returned by painterAlgorithm:", faces);
+    return faces;
+  }
+
+  function drawSurface(visibleFaces, controlPoints) {
     const canvas = document.getElementById('surfaceCanvas');
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw surface grid
-    for (let i = 0; i < points.length; i++) {
-        for (let j = 0; j < points[i].length; j++) {
-            const current = points[i][j];
-            
-            // Draw to next point in row
-            if (j < points[i].length - 1) {
-                const next = points[i][j + 1];
-                ctx.beginPath();
-                ctx.moveTo(current.x * scale + offsetX, current.y * scale + offsetY);
-                ctx.lineTo(next.x * scale + offsetX, next.y * scale + offsetY);
-                ctx.strokeStyle = 'black';
-                ctx.stroke();
-            }
-
-            // Draw to next point in column
-            if (i < points.length - 1) {
-                const next = points[i + 1][j];
-                ctx.beginPath();
-                ctx.moveTo(current.x * scale + offsetX, current.y * scale + offsetY);
-                ctx.lineTo(next.x * scale + offsetX, next.y * scale + offsetY);
-                ctx.strokeStyle = 'black';
-                ctx.stroke();
-            }
-
-            // Fill quadrilateral
-            if (i < points.length - 1 && j < points[i].length - 1) {
-                const p1 = points[i][j];
-                const p2 = points[i][j + 1];
-                const p3 = points[i + 1][j + 1];
-                const p4 = points[i + 1][j];
-
-                ctx.beginPath();
-                ctx.moveTo(p1.x * scale + offsetX, p1.y * scale + offsetY);
-                ctx.lineTo(p2.x * scale + offsetX, p2.y * scale + offsetY);
-                ctx.lineTo(p3.x * scale + offsetX, p3.y * scale + offsetY);
-                ctx.lineTo(p4.x * scale + offsetX, p4.y * scale + offsetY);
-                ctx.closePath();
-                ctx.fillStyle = 'white';
-                ctx.fill();
-                ctx.strokeStyle = 'black';
-                ctx.stroke();
-            }
-        }
+    
+    const xwMin = parseFloat(document.getElementById('xwMin').value);
+    const xwMax = parseFloat(document.getElementById('xwMax').value);
+    const ywMin = parseFloat(document.getElementById('ywMin').value);
+    const ywMax = parseFloat(document.getElementById('ywMax').value);
+    const xvMin = parseFloat(document.getElementById('xvMin').value);
+    const xvMax = parseFloat(document.getElementById('xvMax').value);
+    const yvMin = parseFloat(document.getElementById('yvMin').value);
+    const yvMax = parseFloat(document.getElementById('yvMax').value);
+  
+    const scaleX = (xvMax - xvMin) / (xwMax - xwMin);
+    const scaleY = (yvMax - yvMin) / (ywMax - ywMin);
+    
+    for (const { face } of visibleFaces) {
+      const [p1, p2, p3, p4] = face;
+      
+      // Draw the face
+      ctx.beginPath();
+      ctx.moveTo(
+        (p1.x - xwMin) * scaleX + xvMin,
+        (ywMax - p1.y) * scaleY + yvMin
+      );
+      ctx.lineTo(
+        (p2.x - xwMin) * scaleX + xvMin, 
+        (ywMax - p2.y) * scaleY + yvMin
+      );
+      ctx.lineTo(
+        (p3.x - xwMin) * scaleX + xvMin,
+        (ywMax - p3.y) * scaleY + yvMin
+      );  
+      ctx.lineTo(
+        (p4.x - xwMin) * scaleX + xvMin,
+        (ywMax - p4.y) * scaleY + yvMin
+      );
+      ctx.closePath();
+      
+      // Fill face with background color
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      
+      // Stroke edges with solid color
+      ctx.strokeStyle = '#000000';
+      ctx.stroke();
     }
-
+    
     // Draw control points
     for (let i = 0; i < controlPoints.length; i++) {
-        for (let j = 0; j < controlPoints[i].length; j++) {
-            const point = controlPoints[i][j];
-            
-            ctx.beginPath();
-            ctx.arc(
-                point.x * scale + offsetX,
-                point.y * scale + offsetY,
-                4, // radius
-                0,
-                2 * Math.PI
-            );
-            ctx.fillStyle = selectedPoint && selectedPoint.i === i && selectedPoint.j === j ? 'yellow' : 'red';
-            ctx.fill();
-        }
+      for (let j = 0; j < controlPoints[i].length; j++) {
+        const point = controlPoints[i][j];
+        const screenX = (point.x - xwMin) * scaleX + xvMin;
+        const screenY = (ywMax - point.y) * scaleY + yvMin;
+        
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 4, 0, 2 * Math.PI);
+        ctx.fillStyle =
+          selectedPoint &&
+          selectedPoint.i === i &&
+          selectedPoint.j === j ? 'yellow' : 'red';
+        ctx.fill();
+      }
     }
-}
+  }
 
 function transformToSRC(VRP, P, Y, points) {
     VRP = { x: VRP[0], y: VRP[1], z: VRP[2] };
@@ -274,7 +390,23 @@ function transformToSRC(VRP, P, Y, points) {
     );
 }
 
+function projection(VRP, P, Y, points){
+    // Transformar pontos para SRC e obter a matriz M(SRU,SRC)
+    const srcMatrix = transformToSRCMatrix(VRP, P, Y);
 
+     // 2. Calcular a matriz de mapeamento Mjp
+     const Mjp = calculateMappingMatrix();
+
+     // 3. Calcular a matriz composta M = Mjp * M(SRU,SRC)
+    const M = multiplyMatrices(Mjp, srcMatrix);
+
+    // 4. Aplicar a matriz composta em todos os pontos
+    const transformedPoints = points.map(row => 
+        row.map(point => applyMatrixToPoint(M, point))
+    );
+
+    return transformedPoints;
+}
 
 function generateSurface() {
     const nRows = parseInt(document.getElementById('nRows').value);
@@ -304,14 +436,32 @@ function generateSurface() {
     document.getElementById('controlPointY').value = selectedControlPoint.y.toFixed(1);
     document.getElementById('controlPointZ').value = selectedControlPoint.z.toFixed(1);
 
-    const VRP = [25, 15, 80];
-    const P = [20, 10, 25];
-    const Y = [0, 1, 0]
+    const VRP = [
+        parseFloat(document.getElementById('vrpX').value),
+        parseFloat(document.getElementById('vrpY').value),
+        parseFloat(document.getElementById('vrpZ').value)
+    ];
+    const P = [
+        parseFloat(document.getElementById('focalX').value),
+        parseFloat(document.getElementById('focalY').value),
+        parseFloat(document.getElementById('focalZ').value)
+    ];
+    const Y = [
+        parseFloat(document.getElementById('viewUpX').value),
+        parseFloat(document.getElementById('viewUpY').value),
+        parseFloat(document.getElementById('viewUpZ').value)
+    ];
 
-    console.log("pontos da superficie antes de mover os pontos de controle(SRU):", points)
+    console.log("pontos da superficie antes de mover os pontos de controle(SRU):", points);
     const srcPoints = transformToSRC(VRP, P, Y, points);
-    console.log("pontos da superficie antes de mover os pontos de controle(SRC):", srcPoints)
-    drawSurface(srcPoints, controlPoints);
+    console.log("pontos da superficie antes de mover os pontos de controle(SRC):", srcPoints);
+
+    // Aplicar projeção antes do algoritmo do pintor
+    const projectedPoints = projection(VRP, P, Y, srcPoints);
+    console.log("pontos da superficie PROJEÇÃO(SRT):", projectedPoints);
+
+    const visibleFaces = painterAlgorithm(projectedPoints);
+    drawSurface(visibleFaces, controlPoints);
 }
 
 function updateSelectedControlPoint() {
@@ -328,15 +478,33 @@ function updateSelectedControlPoint() {
     redrawSurface();
   }
 
-function redrawSurface() {
+  function redrawSurface() {
     const points = surface.getSurfacePoints();
+    const VRP = [
+        parseFloat(document.getElementById('vrpX').value),
+        parseFloat(document.getElementById('vrpY').value),
+        parseFloat(document.getElementById('vrpZ').value)
+    ];
+    const P = [
+        parseFloat(document.getElementById('focalX').value),
+        parseFloat(document.getElementById('focalY').value),
+        parseFloat(document.getElementById('focalZ').value)
+    ];
+    const Y = [
+        parseFloat(document.getElementById('viewUpX').value),
+        parseFloat(document.getElementById('viewUpY').value),
+        parseFloat(document.getElementById('viewUpZ').value)
+    ];
+    
     console.log("Pontos da superficie apos mover ponto de controle(SRU):", points);
-    const VRP = [25, 15, 80];
-    const P = [20, 10, 25];
-    const Y = [0, 1, 0];
     const srcPoints = transformToSRC(VRP, P, Y, points);
     console.log("Pontos da superficie apos mover ponto de controle(SRC):", srcPoints);
-    drawSurface(srcPoints, surface.getControlPoints());
+    
+    const projectedPoints = projection(VRP, P, Y, srcPoints);
+    console.log("Pontos da superficie PROJEÇÃO(SRT):", projectedPoints);
+    
+    const visibleFaces = painterAlgorithm(projectedPoints);
+    drawSurface(visibleFaces, surface.getControlPoints());
 }
 
 const controlPointSelect = document.getElementById('controlPointSelect');
