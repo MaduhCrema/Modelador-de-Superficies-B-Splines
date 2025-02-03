@@ -134,15 +134,16 @@ updateControlPoint(i, j, newPoint) {
 }
 
 // Global variables for interaction
+const canvas = document.getElementById('surfaceCanvas');
 let surface;
 let isDragging = false;
 let selectedPoint = null;
 let scale = 80;
-let offsetX = 400;
-let offsetY = 300;
-const canvas = document.getElementById('surfaceCanvas');
+let offsetX = canvas.width/2;
+let offsetY = canvas.height/2;
 
-// Função auxiliar para obter a matriz de transformação SRC
+
+// Função auxiliar para obter a matriz de transformação SRC (OK)
 function transformToSRCMatrix(VRP, P, Y) {
     VRP = { x: VRP[0], y: VRP[1], z: VRP[2] };
     P = { x: P[0], y: P[1], z: P[2] };
@@ -159,6 +160,8 @@ function transformToSRCMatrix(VRP, P, Y) {
 
     const U = { x: V.y * N.z - V.z * N.y, y: V.z * N.x - V.x * N.z, z: V.x * N.y - V.y * N.x };
 
+    //console.log("N/V/U - VECTORS")
+    //console.log(N,V,U)
     return [
         [U.x, U.y, U.z, -(VRP.x * U.x + VRP.y * U.y + VRP.z * U.z)],
         [V.x, V.y, V.z, -(VRP.x * V.x + VRP.y * V.y + VRP.z * V.z)],
@@ -184,7 +187,7 @@ function applyMatrixToPoint(matrix, point) {
     return result;
 }
 
-function calculateMappingMatrix() {
+function calculateMappingMatrix() { //(OK)
     // Pegar valores da janela e viewport dos inputs
     const xwMin = parseFloat(document.getElementById('xwMin').value);
     const xwMax = parseFloat(document.getElementById('xwMax').value);
@@ -208,7 +211,7 @@ function calculateMappingMatrix() {
     ];
 }
 
-function multiplyMatrices(m1, m2) {
+function multiplyMatrices(m1, m2) { //(OK)
     const result = [];
     for (let i = 0; i < 4; i++) {
         result[i] = [];
@@ -287,7 +290,8 @@ function painterAlgorithm(points) {
     return faces;
   }
 
-  function drawSurface(visibleFaces, controlPoints) {
+  function drawSurface(projectedPoints, controlPoints) {
+    console.log("pintou")
     const canvas = document.getElementById('surfaceCanvas');
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -304,55 +308,34 @@ function painterAlgorithm(points) {
     const scaleX = (xvMax - xvMin) / (xwMax - xwMin);
     const scaleY = (yvMax - yvMin) / (ywMax - ywMin);
     
-    for (const { face } of visibleFaces) {
-      const [p1, p2, p3, p4] = face;
-      
-      // Draw the face
-      ctx.beginPath();
-      ctx.moveTo(
-        (p1.x - xwMin) * scaleX + xvMin,
-        (ywMax - p1.y) * scaleY + yvMin
-      );
-      ctx.lineTo(
-        (p2.x - xwMin) * scaleX + xvMin, 
-        (ywMax - p2.y) * scaleY + yvMin
-      );
-      ctx.lineTo(
-        (p3.x - xwMin) * scaleX + xvMin,
-        (ywMax - p3.y) * scaleY + yvMin
-      );  
-      ctx.lineTo(
-        (p4.x - xwMin) * scaleX + xvMin,
-        (ywMax - p4.y) * scaleY + yvMin
-      );
-      ctx.closePath();
-      
-      // Fill face with background color
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fill();
-      
-      // Stroke edges with solid color
-      ctx.strokeStyle = '#000000';
-      ctx.stroke();
-    }
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
     
-    // Draw control points
+     // Desenhar pontos projetados
+     ctx.fillStyle = 'blue';
+     for (let i = 0; i < projectedPoints.length; i++) {
+         for (let j = 0; j < projectedPoints[i].length; j++) {
+             const point = projectedPoints[i][j];
+             ctx.beginPath();
+             ctx.arc(point.x, point.y, 3, 0, 2 * Math.PI);
+             ctx.fill();
+         }
+     }
+    
+    // Desenhar pontos de controle
+    ctx.fillStyle = 'red';
     for (let i = 0; i < controlPoints.length; i++) {
-      for (let j = 0; j < controlPoints[i].length; j++) {
-        const point = controlPoints[i][j];
-        const screenX = (point.x - xwMin) * scaleX + xvMin;
-        const screenY = (ywMax - point.y) * scaleY + yvMin;
-        
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, 4, 0, 2 * Math.PI);
-        ctx.fillStyle =
-          selectedPoint &&
-          selectedPoint.i === i &&
-          selectedPoint.j === j ? 'yellow' : 'red';
-        ctx.fill();
-      }
+        for (let j = 0; j < controlPoints[i].length; j++) {
+            const point = controlPoints[i][j];
+            const screenX = point.x * scaleX + xvMin;
+            const screenY = ywMax - point.y * scaleY + yvMin;
+            
+            ctx.beginPath();
+            ctx.arc(screenX, screenY, 2, 0, 2 * Math.PI);
+            ctx.fill();
+        }
     }
-  }
+}
 
 function transformToSRC(VRP, P, Y, points) {
     VRP = { x: VRP[0], y: VRP[1], z: VRP[2] };
@@ -393,18 +376,26 @@ function transformToSRC(VRP, P, Y, points) {
 function projection(VRP, P, Y, points){
     // Transformar pontos para SRC e obter a matriz M(SRU,SRC)
     const srcMatrix = transformToSRCMatrix(VRP, P, Y);
-
+    //console.log("MATRIZ to SRC")
+    //console.log(srcMatrix)
      // 2. Calcular a matriz de mapeamento Mjp
      const Mjp = calculateMappingMatrix();
 
+    //console.log("MATRIZ to MJP")
+    //console.log(Mjp)
      // 3. Calcular a matriz composta M = Mjp * M(SRU,SRC)
     const M = multiplyMatrices(Mjp, srcMatrix);
+
+    //console.log("MATRIZ Composta")
+    //console.log(M)
 
     // 4. Aplicar a matriz composta em todos os pontos
     const transformedPoints = points.map(row => 
         row.map(point => applyMatrixToPoint(M, point))
     );
 
+    //console.log("PONTOS FINAIS")
+    //console.log(transformedPoints)
     return transformedPoints;
 }
 
@@ -452,16 +443,17 @@ function generateSurface() {
         parseFloat(document.getElementById('viewUpZ').value)
     ];
 
+    //TESTES//
     console.log("pontos da superficie antes de mover os pontos de controle(SRU):", points);
     const srcPoints = transformToSRC(VRP, P, Y, points);
     console.log("pontos da superficie antes de mover os pontos de controle(SRC):", srcPoints);
 
-    // Aplicar projeção antes do algoritmo do pintor
-    const projectedPoints = projection(VRP, P, Y, srcPoints);
+    // Aplicar projeção antes do algoritmo do pintor????
+    const projectedPoints = projection(VRP, P, Y, points);
     console.log("pontos da superficie PROJEÇÃO(SRT):", projectedPoints);
 
-    const visibleFaces = painterAlgorithm(projectedPoints);
-    drawSurface(visibleFaces, controlPoints);
+    //const visibleFaces = painterAlgorithm(projectedPoints);
+    drawSurface(projectedPoints, controlPoints);
 }
 
 function updateSelectedControlPoint() {
@@ -503,8 +495,8 @@ function updateSelectedControlPoint() {
     const projectedPoints = projection(VRP, P, Y, srcPoints);
     console.log("Pontos da superficie PROJEÇÃO(SRT):", projectedPoints);
     
-    const visibleFaces = painterAlgorithm(projectedPoints);
-    drawSurface(visibleFaces, surface.getControlPoints());
+    //const visibleFaces = painterAlgorithm(projectedPoints);
+    drawSurface(projectedPoints, surface.getControlPoints());
 }
 
 const controlPointSelect = document.getElementById('controlPointSelect');
