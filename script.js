@@ -429,7 +429,7 @@ function Painter(surfacePoints) {
     renderWireframe(sortedFaces,
         '#00FF00',  // visibleColor
         '#FF0000',  // hiddenColor
-        '#FFFFFF'   // backgroundColor
+        '#000000'   // backgroundColor
     );
 
 }
