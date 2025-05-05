@@ -1,230 +1,426 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Modelador de Superfícies B-Spline</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-        
-        .container {
-            display: flex;
-            flex: 1;
-        }
-        
-        .controls {
-            width: 300px;
-            padding: 10px;
-            background-color: #f5f5f5;
-            border-right: 1px solid #ddd;
-            overflow-y: auto;
-        }
-        
-        .canvas-container {
-            flex: 1;
-            background-color: #fff;
-            position: relative;
-        }
-        
-        .section {
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        
-        .section h3 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        input, select {
-            width: 100%;
-            padding: 5px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-        
-        button {
-            padding: 8px 15px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 5px;
-            margin-bottom: 5px;
-        }
-        
-        button:hover {
-            background-color: #45a049;
-        }
-        
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <h2>Modelador de Superfícies B-Spline</h2>
+
     <div class="container">
+        <!-- Painel de Controles -->
         <div class="controls">
+            <!-- Seção: Gerenciamento de Superfícies -->
             <div class="section">
-                <h3>Parâmetros da Superfície</h3>
-                <label for="nRows">Número de Linhas:</label>
-                <input type="number" id="nRows" min="4" max="100" value="6">
-                
-                <label for="nCols">Número de Colunas:</label>
-                <input type="number" id="nCols" min="4" max="100" value="6">
-                
-                <label for="uStep">Passo U:</label>
-                <input type="number" id="uStep" min="0.01" max="0.5" step="0.01" value="0.21">
-                
-                <label for="vStep">Passo V:</label>
-                <input type="number" id="vStep" min="0.01" max="0.5" step="0.01" value="0.21">
-                
-                <button id="generateButton">Gerar Superfície</button>
+                <h3>Gerenciamento de Superfícies</h3>
+                <div class="section-content">
+                    <div class="surfaces-list" id="surfacesList">
+                        <!-- Lista de superfícies será adicionada dinamicamente -->
+                        <p class="empty-list">Nenhuma superfície criada</p>
+                    </div>
+                    <div class="grid-2">
+                        <button id="createSurfaceButton" class="full-width">Nova Superfície</button>
+                        <button id="deleteSurfaceButton" class="full-width">Excluir Superfície</button>
+                    </div>
+                    <div class="grid-2" style="margin-top: 10px;">
+                        <button id="saveStateButton" class="full-width">Salvar Configuração</button>
+                        <button id="loadStateButton" class="full-width">Carregar Configuração</button>
+                    </div>
+                    <input type="file" id="fileInput" accept=".json" style="display: none;">
+                </div>
             </div>
-            
+
+            <!-- Seção: Superfície e Pontos de Controle -->
             <div class="section">
-                <h3>Pontos de Controle</h3>
-                <label for="controlPointSelect">Selecionar Ponto:</label>
-                <select id="controlPointSelect"></select>
-                
-                <label for="controlPointX">X:</label>
-                <input type="number" id="controlPointX" step="0.1" value="0">
-                
-                <label for="controlPointY">Y:</label>
-                <input type="number" id="controlPointY" step="0.1" value="0">
-                
-                <label for="controlPointZ">Z:</label>
-                <input type="number" id="controlPointZ" step="0.1" value="0">
+                <h3>Superfície e Pontos de Controle</h3>
+                <div class="section-content">
+                    <!-- Parâmetros da Superfície -->
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="nRows">Linhas:</label>
+                            <input type="number" id="nRows" min="4" max="100" value="30">
+                        </div>
+                        <div class="form-group">
+                            <label for="nCols">Colunas:</label>
+                            <input type="number" id="nCols" min="4" max="100" value="30">
+                        </div>
+                    </div>
+                    <button id="testRotationButton" class="full-width">Testar Rotação Contínua</button>
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label for="uStep">Passo U:</label>
+                            <input type="number" id="uStep" min="0.01" max="0.5" step="0.01" value="0.21">
+                        </div>
+                        <div class="form-group">
+                            <label for="vStep">Passo V:</label>
+                            <input type="number" id="vStep" min="0.01" max="0.5" step="0.01" value="0.21">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="showControlPoints" style="display: inline-block; margin-right: 10px;">
+                            Mostrar Pontos de Controle:
+                        </label>
+                        <input type="checkbox" id="showControlPoints" checked style="width: auto;">
+                    </div>
+
+
+                    <hr>
+
+                    <!-- Manipulação de Pontos de Controle -->
+                    <div class="form-group">
+                        <label for="controlPointSelect">Selecionar Ponto:</label>
+                        <select id="controlPointSelect"></select>
+                    </div>
+
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label for="controlPointX">X:</label>
+                            <input type="number" id="controlPointX" step="0.1" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="controlPointY">Y:</label>
+                            <input type="number" id="controlPointY" step="0.1" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="controlPointZ">Z:</label>
+                            <input type="number" id="controlPointZ" step="0.1" value="0">
+                        </div>
+                    </div>
+                </div>
             </div>
-            
+
+            <!-- Seção: Visualização e Viewport -->
             <div class="section">
-                <h3>Visualização</h3>
-                <label for="vrpX">VRP X:</label>
-                <input type="number" id="vrpX" step="0.5" value="25">
-                
-                <label for="vrpY">VRP Y:</label>
-                <input type="number" id="vrpY" step="0.5" value="15">
-                
-                <label for="vrpZ">VRP Z:</label>
-                <input type="number" id="vrpZ" step="0.5" value="80">
-                
-                <label for="focalX">Ponto Focal X:</label>
-                <input type="number" id="focalX" step="0.5" value="20">
-                
-                <label for="focalY">Ponto Focal Y:</label>
-                <input type="number" id="focalY" step="0.5" value="10">
-                
-                <label for="focalZ">Ponto Focal Z:</label>
-                <input type="number" id="focalZ" step="0.5" value="25">
-                
-                <label for="viewUpX">Vetor Up X:</label>
-                <input type="number" id="viewUpX" step="0.5" value="0">
-                
-                <label for="viewUpY">Vetor Up Y:</label>
-                <input type="number" id="viewUpY" step="0.5" value="1">
-                
-                <label for="viewUpZ">Vetor Up Z:</label>
-                <input type="number" id="viewUpZ" step="0.5" value="0">
-                
-                <button id="updateViewButton">Atualizar Visualização</button>
+                <h3>Visualização e Viewport</h3>
+                <div class="section-content">
+                    <!-- Navegação em Abas -->
+                    <div class="control-tabs">
+                        <div class="tab active" data-tab="view-parameters">Câmera</div>
+                        <div class="tab" data-tab="viewport">Viewport</div>
+                    </div>
+
+                    <!-- Aba: Parâmetros de Câmera -->
+                    <div class="tab-content active" id="view-parameters">
+                        <h4>Parâmetros da Câmera</h4>
+
+                        <!-- View Reference Point (VRP) -->
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="vrpX">VRP X:</label>
+                                <input type="number" id="vrpX" step="0.5" value="25">
+                            </div>
+                            <div class="form-group">
+                                <label for="vrpY">VRP Y:</label>
+                                <input type="number" id="vrpY" step="0.5" value="25">
+                            </div>
+                            <div class="form-group">
+                                <label for="vrpZ">VRP Z:</label>
+                                <input type="number" id="vrpZ" step="0.5" value="25">
+                            </div>
+                        </div>
+
+                        <!-- Focal Point (P) -->
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="focalX">Focal X:</label>
+                                <input type="number" id="focalX" step="0.5" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="focalY">Focal Y:</label>
+                                <input type="number" id="focalY" step="0.5" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="focalZ">Focal Z:</label>
+                                <input type="number" id="focalZ" step="0.5" value="0">
+                            </div>
+                        </div>
+
+                        <!-- View Up Vector (Y) -->
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="viewUpX">Up X:</label>
+                                <input type="number" id="viewUpX" step="0.5" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="viewUpY">Up Y:</label>
+                                <input type="number" id="viewUpY" step="0.5" value="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="viewUpZ">Up Z:</label>
+                                <input type="number" id="viewUpZ" step="0.5" value="0">
+                            </div>
+                        </div>
+
+                        <button id="updateViewButton" class="full-width">Atualizar Visualização</button>
+                    </div>
+
+                    <!-- Aba: Window e Viewport -->
+                    <div class="tab-content" id="viewport">
+                        <h4>Window e Viewport</h4>
+
+                        <!-- Window (Janela) -->
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="xwMin">Window Min X:</label>
+                                <input type="number" id="xwMin" step="1" value="-20">
+                            </div>
+                            <div class="form-group">
+                                <label for="xwMax">Window Max X:</label>
+                                <input type="number" id="xwMax" step="1" value="20">
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="ywMin">Window Min Y:</label>
+                                <input type="number" id="ywMin" step="1" value="-15">
+                            </div>
+                            <div class="form-group">
+                                <label for="ywMax">Window Max Y:</label>
+                                <input type="number" id="ywMax" step="1" value="15">
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Viewport -->
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="xvMin">Viewport Min X:</label>
+                                <input type="number" id="xvMin" step="10" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="xvMax">Viewport Max X:</label>
+                                <input type="number" id="xvMax" step="10" value="800">
+                            </div>
+                        </div>
+
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="yvMin">Viewport Min Y:</label>
+                                <input type="number" id="yvMin" step="10" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="yvMax">Viewport Max Y:</label>
+                                <input type="number" id="yvMax" step="10" value="600">
+                            </div>
+                        </div>
+
+                        <button id="updateWindowButton" class="full-width">Atualizar Window/Viewport</button>
+                    </div>
+                </div>
             </div>
-            
-            <div class="section">
-                <h3>Window e Viewport</h3>
-                <label for="xwMin">Window Min X:</label>
-                <input type="number" id="xwMin" step="1" value="-20">
-                
-                <label for="xwMax">Window Max X:</label>
-                <input type="number" id="xwMax" step="1" value="20">
-                
-                <label for="ywMin">Window Min Y:</label>
-                <input type="number" id="ywMin" step="1" value="-15">
-                
-                <label for="ywMax">Window Max Y:</label>
-                <input type="number" id="ywMax" step="1" value="15">
-                
-                <label for="xvMin">Viewport Min X:</label>
-                <input type="number" id="xvMin" step="10" value="0">
-                
-                <label for="xvMax">Viewport Max X:</label>
-                <input type="number" id="xvMax" step="10" value="800">
-                
-                <label for="yvMin">Viewport Min Y:</label>
-                <input type="number" id="yvMin" step="10" value="0">
-                
-                <label for="yvMax">Viewport Max Y:</label>
-                <input type="number" id="yvMax" step="10" value="600">
-                
-                <button id="updateWindowButton">Atualizar Window/Viewport</button>
-            </div>
-            
+
+            <!-- Seção: Transformações -->
             <div class="section">
                 <h3>Transformações</h3>
-                
-                <label for="translationX">Translação X:</label>
-                <input type="number" id="translationX" step="0.5" value="20">
-                
-                <label for="translationY">Translação Y:</label>
-                <input type="number" id="translationY" step="0.5" value="0">
-                
-                <label for="translationZ">Translação Z:</label>
-                <input type="number" id="translationZ" step="0.5" value="0">
-                
-                <label for="rotationX">Rotação X (graus):</label>
-                <input type="number" id="rotationX" step="5" value="35" min="60" max="360">
-                
-                <label for="rotationY">Rotação Y (graus):</label>
-                <input type="number" id="rotationY" step="5" value="30" min="0" max="360">
-                
-                <label for="rotationZ">Rotação Z (graus):</label>
-                <input type="number" id="rotationZ" step="5" value="35" min="30" max="360">
-                
-                <label for="scale">Escala (uniforme):</label>
-                <input type="number" id="scale" step="0.1" value="5" min="0.1">
-                
-                <button id="applyTransformButton">Aplicar Transformações</button>
-                <button id="resetTransformButton">Resetar Transformações</button>
+                <div class="section-content">
+                    <!-- Translação -->
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label for="translationX">Transl. X:</label>
+                            <input type="number" id="translationX" step="0.5" value="20">
+                        </div>
+                        <div class="form-group">
+                            <label for="translationY">Transl. Y:</label>
+                            <input type="number" id="translationY" step="0.5" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="translationZ">Transl. Z:</label>
+                            <input type="number" id="translationZ" step="0.5" value="0">
+                        </div>
+                    </div>
+
+                    <!-- Rotação -->
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label for="rotationX">Rot. X (°):</label>
+                            <input type="number" id="rotationX" step="5" value="35" min="0" max="360">
+                        </div>
+                        <div class="form-group">
+                            <label for="rotationY">Rot. Y (°):</label>
+                            <input type="number" id="rotationY" step="5" value="30" min="0" max="360">
+                        </div>
+                        <div class="form-group">
+                            <label for="rotationZ">Rot. Z (°):</label>
+                            <input type="number" id="rotationZ" step="5" value="35" min="0" max="360">
+                        </div>
+                    </div>
+
+                    <!-- Escala -->
+                    <div class="form-group">
+                        <label for="scale">Escala (uniforme):</label>
+                        <input type="number" id="scale" step="0.1" value="5" min="0.1">
+                    </div>
+
+                    <div class="grid-2">
+                        <button id="applyTransformButton">Aplicar</button>
+                        <button id="resetTransformButton">Resetar</button>
+                    </div>
+                </div>
             </div>
-            
+
+            <!-- Seção: Aparência -->
             <div class="section">
-                <h3>Cores</h3>
-                <label for="visibleColor">Cor Faces Visíveis:</label>
-                <input type="color" id="visibleColor" value="#00FF00">
-                
-                <label for="hiddenColor">Cor Faces Não Visíveis:</label>
-                <input type="color" id="hiddenColor" value="#FF0000">
-                
-                <button id="updateColorsButton">Atualizar Cores</button>
+                <h3>Aparência</h3>
+                <div class="section-content">
+                    <!-- Navegação em Abas -->
+                    <div class="control-tabs">
+                        <div class="tab active" data-tab="cores">Cores</div>
+                        <div class="tab" data-tab="rgb">Iluminação/materiais</div>
+                    </div>
+
+                    <!-- Aba: Cores -->
+                    <div class="tab-content active" id="cores">
+                        <div class="grid-2">
+                            <div class="form-group">
+                                <label for="visibleColor">Faces Visíveis:</label>
+                                <input type="color" id="visibleColor" value="#00FF00">
+                            </div>
+                            <div class="form-group">
+                                <label for="hiddenColor">Faces Ocultas:</label>
+                                <input type="color" id="hiddenColor" value="#FF0000">
+                            </div>
+                        </div>
+                        <button id="updateColorsButton" class="full-width">Atualizar Cores</button>
+                    </div>
+
+                    <!-- Nova Aba: Iluminação RGB -->
+                    <div class="tab-content" id="rgb">
+                        <h4>Iluminação RGB</h4>
+
+                        <!-- Posição da Luz -->
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="lightX">Luz X:</label>
+                                <input type="number" id="lightX" value="70" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="lightY">Luz Y:</label>
+                                <input type="number" id="lightY" value="20" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="lightZ">Luz Z:</label>
+                                <input type="number" id="lightZ" value="35" step="1">
+                            </div>
+                        </div>
+
+                        <!-- Intensidade da Luz RGB -->
+                        <h5>Intensidade da Luz:</h5>
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="lightIntensityR">Luz R:</label>
+                                <input type="number" id="lightIntensityR" value="150" min="0" max="255" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="lightIntensityG">Luz G:</label>
+                                <input type="number" id="lightIntensityG" value="150" min="0" max="255" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="lightIntensityB">Luz B:</label>
+                                <input type="number" id="lightIntensityB" value="150" min="0" max="255" step="1">
+                            </div>
+                        </div>
+
+                        <!-- Intensidade da Luz Ambiente RGB -->
+                        <h5>Intensidade Ambiente:</h5>
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="ambientIntensityR">Ambiente R:</label>
+                                <input type="number" id="ambientIntensityR" value="120" min="0" max="255" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="ambientIntensityG">Ambiente G:</label>
+                                <input type="number" id="ambientIntensityG" value="120" min="0" max="255" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="ambientIntensityB">Ambiente B:</label>
+                                <input type="number" id="ambientIntensityB" value="120" min="0" max="255" step="1">
+                            </div>
+                        </div>
+
+                        <!-- Coeficientes do Material RGB -->
+                        <h5>Coeficientes do Material:</h5>
+
+                        <!-- Ka RGB -->
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="materialKaR">Ka R:</label>
+                                <input type="number" id="materialKaR" value="0.4" min="0" max="1" step="0.05">
+                            </div>
+                            <div class="form-group">
+                                <label for="materialKaG">Ka G:</label>
+                                <input type="number" id="materialKaG" value="0.4" min="0" max="1" step="0.05">
+                            </div>
+                            <div class="form-group">
+                                <label for="materialKaB">Ka B:</label>
+                                <input type="number" id="materialKaB" value="0.4" min="0" max="1" step="0.05">
+                            </div>
+                        </div>
+
+                        <!-- Kd RGB -->
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="materialKdR">Kd R:</label>
+                                <input type="number" id="materialKdR" value="0.7" min="0" max="1" step="0.05">
+                            </div>
+                            <div class="form-group">
+                                <label for="materialKdG">Kd G:</label>
+                                <input type="number" id="materialKdG" value="0.7" min="0" max="1" step="0.05">
+                            </div>
+                            <div class="form-group">
+                                <label for="materialKdB">Kd B:</label>
+                                <input type="number" id="materialKdB" value="0.7" min="0" max="1" step="0.05">
+                            </div>
+                        </div>
+
+                        <!-- Ks RGB -->
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label for="materialKsR">Ks R:</label>
+                                <input type="number" id="materialKsR" value="0.5" min="0" max="1" step="0.05">
+                            </div>
+                            <div class="form-group">
+                                <label for="materialKsG">Ks G:</label>
+                                <input type="number" id="materialKsG" value="0.5" min="0" max="1" step="0.05">
+                            </div>
+                            <div class="form-group">
+                                <label for="materialKsB">Ks B:</label>
+                                <input type="number" id="materialKsB" value="0.5" min="0" max="1" step="0.05">
+                            </div>
+                        </div>
+
+                        <!-- Expoente n -->
+                        <div class="form-group">
+                            <label for="materialN">n (Brilho):</label>
+                            <input type="number" id="materialN" value="2.15" min="1" max="100" step="0.1">
+                        </div>
+
+                        <button id="renderWithRGBShadingButton" class="full-width">Renderizar com Sombreamento Constante</button>
+                        <button id="renderWithRGBGouraudButton" class="full-width" style="margin-top: 10px;">Renderizar com Gouraud</button>
+                        <button id="renderWithPhongButton" class="full-width" style="margin-top: 10px;">Renderizar com Phong</button>
+                    </div>
+                </div>
             </div>
         </div>
-        
+
+        <!-- Área do Canvas -->
         <div class="canvas-container">
             <canvas id="surfaceCanvas"></canvas>
         </div>
     </div>
 
     <!-- Scripts -->
-    <script src="script.js"></script>
+    <script src="js/bspline.js"></script>
+    <script src="js/transforms.js"></script>
+    <script src="js/rendering.js"></script>
+    <script src="js/controller.js"></script>
+    <script src="js/ui.js"></script>
 </body>
+
 </html>
