@@ -26,4 +26,4 @@ Este projeto foi desenvolvido como parte do Trabalho 2 da disciplina de Computa�
 5. **Interface Interativa**:
    - Todos os parâmetros relacionados com as superfícies (número de pontos de controle, linhas interpoladas, materiais, etc.), câmera, window, viewport e luzes são editáveis em tempo de execução.
 
-![alt text](https://github.com/MaduhCrema/Modelador-de-Superficies-B-Splines/blob/master/GravaodeTela2025-05-05142534-ezgif.com-video-to-gif-converter.gif)
+![alt text](https://github.com/MaduhCrema/Modelador-de-Superficies-B-Splines/blob/master/modelador.mp4)
